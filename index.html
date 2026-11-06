@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Câu hỏi Đường lên đỉnh Olympia 19–26</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;max-width:860px;margin:0 auto;padding:1rem}
+input,select{font:inherit;padding:.4rem;margin:0 .3rem .5rem 0}
+#q{width:100%;box-sizing:border-box}
+.c{border-bottom:1px solid #ddd;padding:.6rem 0}
+.m{font-size:.8rem;color:#666}
+details summary{cursor:pointer;color:#06c}
+footer{font-size:.85rem;color:#555;margin:2rem 0}
+</style>
+<h1>Câu hỏi Đường lên đỉnh Olympia (mùa 19–26)</h1>
+<p><a href="questions.csv">Tải CSV</a> · <a href="olympia_deck.apkg">Tải bộ thẻ Anki</a></p>
+<input id="q" placeholder="Tìm câu hỏi hoặc đáp án (gõ không dấu cũng được)…" autofocus>
+<select id="s"><option value="">Mọi mùa</option></select>
+<select id="r"><option value="">Mọi vòng</option></select>
+<select id="j"><option value="">Mọi môn</option></select>
+<span id="n"></span>
+<div id="out"></div>
+<footer>
+Nguồn: <a href="https://duong-len-dinh-olympia.fandom.com/vi">Đường lên đỉnh Olympia Wiki</a> (CC-BY-SA); câu hỏi thuộc về VTV.
+Cột "môn" do AI gắn tự động nên có thể sai. Chia sẻ lại phải giữ giấy phép CC-BY-SA.
+</footer>
+<script>
+// ponytail: plain filter over all rows; fine for ~20k, add an index/Fuse if it gets slow
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+const $ = id => document.getElementById(id);
+function parseCSV(t) { // handles quoted fields with commas/newlines/""
+  const rows = []; let r = [], f = "", q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i+1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { r.push(f); f = ""; }
+    else if (c === "\n") { r.push(f); rows.push(r); r = []; f = ""; }
+    else if (c !== "\r") f += c;
+  }
+  if (f || r.length) { r.push(f); rows.push(r); }
+  return rows;
+}
+let D = [];
+fetch("questions.csv").then(r => r.text()).then(t => {
+  const [h, ...rs] = parseCSV(t);
+  D = rs.filter(r => r.length === h.length).map(r => {
+    const o = Object.fromEntries(h.map((k, i) => [k, r[i]]));
+    o.k = norm(o.question + " " + o.answer); return o;
+  });
+  const fill = (id, key, num) => {
+    let v = [...new Set(D.map(o => o[key]))];
+    v.sort(num ? (a, b) => b - a : undefined);
+    $(id).append(...v.map(x => new Option(num ? "Mùa " + x : x, x)));
+  };
+  fill("s", "season", 1); fill("r", "round"); fill("j", "subject");
+  render();
+});
+function render() {
+  const q = norm($("q").value.trim()), s = $("s").value, r = $("r").value, j = $("j").value;
+  const hit = D.filter(o => (!s || o.season === s) && (!r || o.round === r) && (!j || o.subject === j) && (!q || o.k.includes(q)));
+  $("n").textContent = hit.length + " câu";
+  $("out").replaceChildren(...hit.slice(0, 100).map(o => {
+    const d = document.createElement("div"); d.className = "c";
+    const m = document.createElement("div"); m.className = "m";
+    m.textContent = `Mùa ${o.season} · ${o.match} · ${o.round} · ${o.subject}`;
+    const p = document.createElement("div"); p.textContent = o.question;
+    const e = document.createElement("details"), u = document.createElement("summary");
+    u.textContent = "Đáp án"; e.append(u, o.answer);
+    d.append(m, p, e); return d;
+  }));
+}
+["q", "s", "r", "j"].forEach(id => $(id).addEventListener("input", render));
+</script>

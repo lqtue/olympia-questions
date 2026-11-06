@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mạng liên hệ kiến thức Olympia</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;max-width:860px;margin:0 auto;padding:1rem}
+input{font:inherit;padding:.4rem;width:100%;box-sizing:border-box}
+a{color:#06c;cursor:pointer}
+h2{margin:.2rem 0}
+h3{margin:1.2rem 0 .3rem;font-size:1rem}
+.chip{display:inline-block;margin:.15rem .3rem .15rem 0;padding:.1rem .5rem;border:1px solid #ccd;border-radius:1rem}
+.chip small{color:#666}
+details{margin:.2rem 0}
+summary{cursor:pointer}
+.ev{font-size:.9rem;color:#444;margin:.2rem 0 .4rem 1rem}
+footer{font-size:.85rem;color:#555;margin:2rem 0}
+</style>
+<p><a href="./">← Câu hỏi</a></p>
+<h1>Mạng liên hệ kiến thức</h1>
+<p>Gõ một tên, khái niệm hay địa danh. Mỗi liên hệ đều kèm câu hỏi thật làm bằng chứng: bấm vào để xem.</p>
+<input id="q" placeholder="vd: Nguyễn Trãi, Bạch Đằng, UNESCO…" autofocus>
+<div id="out"></div>
+<footer>
+Chỉ có hai loại liên hệ, đều lấy trực tiếp từ câu hỏi: <b>hỏi → đáp án</b> (câu hỏi nhắc tên A và đáp án là B) và <b>cùng đáp án</b> (A, B là hai phần của một đáp án dạng danh sách).
+Việc nhận diện tên riêng là tự động nên vẫn có thể sót hoặc nhầm; hãy xem câu hỏi bằng chứng.
+Nguồn: <a href="https://duong-len-dinh-olympia.fandom.com/vi">Đường lên đỉnh Olympia Wiki</a> (CC-BY-SA); câu hỏi thuộc về VTV.
+</footer>
+<script>
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+const $ = id => document.getElementById(id);
+const h = (tag, props, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+let N, Q, keys, nk;
+fetch("kg.json").then(r => r.json()).then(d => {
+  N = d.nodes; Q = d.q; keys = Object.keys(N); nk = keys.map(norm);
+  route();
+});
+const go = e => { location.hash = encodeURIComponent(e); };
+addEventListener("hashchange", route);
+$("q").addEventListener("input", () => {
+  const q = norm($("q").value.trim());
+  if (!q) return route();
+  const hit = keys.filter((k, i) => nk[i].includes(q))
+    .sort((a, b) => (N[b].a + N[b].m) - (N[a].a + N[a].m)).slice(0, 40);
+  $("out").replaceChildren(...hit.map(k => h("div", {}, h("a", { onclick: () => go(k) }, k), ` (${N[k].a + N[k].m} câu hỏi)`)));
+});
+function evs(list) {
+  return list.map(i => h("div", { className: "ev" }, `Mùa ${Q[i][3]}: ${Q[i][1]} → `, h("b", {}, Q[i][2])));
+}
+function section(title, rows) {
+  if (!rows.length) return [];
+  return [h("h3", {}, title), ...rows.map(([o, c, ev]) =>
+    h("details", {}, h("summary", {}, h("a", { onclick: e => { e.preventDefault(); go(o); } }, o), ` ×${c}`), ...evs(ev)))];
+}
+function route() {
+  if (!N) return;
+  const e = decodeURIComponent(location.hash.slice(1));
+  if (!N[e]) return $("out").replaceChildren(h("p", {}, "Gõ tên vào ô tìm kiếm ở trên."));
+  const v = N[e], by = k => v.e.filter(t => t[1] === k).map(t => [t[0], t[2], t[3]]);
+  $("q").value = e;
+  $("out").replaceChildren(
+    h("h2", {}, e),
+    h("div", {}, `Là đáp án ${v.a} lần · được nhắc trong ${v.m} câu hỏi · xuất hiện ở ${v.y} mùa · môn nhiều nhất: ${v.s} (môn do AI gắn)`),
+    ...section("Khi câu hỏi nhắc tới đây, đáp án là…", by("a")),
+    ...section("Đây là đáp án của các câu hỏi nhắc tới…", by("r")),
+    ...section("Cùng xuất hiện trong một đáp án với…", by("s")));
+}
+</script>
